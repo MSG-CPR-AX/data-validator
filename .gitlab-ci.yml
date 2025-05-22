@@ -1,58 +1,6 @@
-# GitLab CI/CD configuration for bookmark validation
+# data-validator 프로젝트의 .gitlab-ci.yml
 
-stages:
-  - validate  # 기존 스테이지
-  - build     # Docker 이미지 빌드 스테이지
-  - publish   # Docker 이미지 배포 스테이지
+include:
+  - local: '/docker-build-ci.yml'
 
-# 기존 검증 작업
-validate_bookmarks:
-  stage: validate
-  image: python:3.11-alpine
-  before_script:
-    - pip install pyyaml
-  script:
-    - python3 scripts/validate_bookmarks.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_PATH != "sidebar-data/data-validator"'
-      when: always
-
-# Docker 이미지 빌드 작업
-build_docker_image:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: "/certs"
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-  script:
-    - docker build -t $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
-    - docker push $CI_REGISTRY_IMAGE:latest
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - scripts/validate_bookmarks.py
-        - Dockerfile
-    - if: '$CI_COMMIT_TAG'  # 태그가 생성된 경우에도 실행
-
-# 태그 버전 배포 (선택 사항)
-publish_tagged_version:
-  stage: publish
-  image: docker:latest
-  services:
-    - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: "/certs"
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-  script:
-    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
-  rules:
-    - if: '$CI_COMMIT_TAG'
+# 다른 검증 작업이 필요하다면 여기에 추가

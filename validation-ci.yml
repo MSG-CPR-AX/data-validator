@@ -1,0 +1,15 @@
+# validation-ci.yml - 북마크 검증용 CI 구성
+# 이 파일은 다른 프로젝트에서 include하여 사용합니다.
+
+stages:
+  - validate
+
+validate_bookmarks:
+  stage: validate
+  image: registry.gitlab.com/sidebar-data/data-validator:latest
+  script:
+    - cd $CI_PROJECT_DIR
+    - python3 /app/validate_bookmarks.py
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
