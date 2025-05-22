@@ -11,5 +11,9 @@ validate_bookmarks:
     - cd $CI_PROJECT_DIR
     - python3 /app/validate_bookmarks.py
   rules:
+    # data-validator 프로젝트에서는 실행하지 않음
+    - if: '$CI_PROJECT_NAME == "data-validator"'
+      when: never
+    # 머지 리퀘스트에서만 실행
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: always

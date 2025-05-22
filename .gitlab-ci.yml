@@ -1,6 +1,14 @@
 # data-validator 프로젝트의 .gitlab-ci.yml
 
 include:
+  # Docker 빌드 작업 - data-validator 프로젝트에서만 실행
   - local: '/docker-build-ci.yml'
+    rules:
+      - if: '$CI_PROJECT_NAME == "data-validator"'
+        when: always
 
-# 다른 검증 작업이 필요하다면 여기에 추가
+  # 북마크 검증 작업 - 다른 프로젝트에서만 실행
+  - local: '/validation-ci.yml'
+    rules:
+      - if: '$CI_PROJECT_NAME != "data-validator"'
+        when: always
