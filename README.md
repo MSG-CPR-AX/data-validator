@@ -11,6 +11,41 @@ GitLab Project Mirroring
 - **하위 프로젝트**: data-validator (검증 스크립트와 Docker 이미지 관리)
 - **다른 프로젝트들**: bookmark-data, application, ops 등이 data-validator의 검증 로직을 사용함
 
+## 배포 토큰 설정 가이드
+
+북마크 데이터 검증 시스템은 GitLab API에 접근하기 위해 배포 토큰(Deploy Token)을 사용합니다. 배포 토큰은 보안을 위해 암호화되어 저장되고 실행 시에만 복호화됩니다.
+
+### 1. 배포 토큰 생성
+
+1. GitLab 그룹 설정 페이지로 이동합니다.
+2. 왼쪽 메뉴에서 "설정 > 저장소 > 배포 토큰"을 선택합니다.
+3. 새 배포 토큰을 생성합니다:
+   - 이름: `bookmark-validator`
+   - 범위: `read_repository` 권한만 선택
+4. 생성된 토큰 정보(사용자 이름과 토큰 값)를 안전하게 보관합니다.
+
+### 2. 토큰 암호화
+
+토큰을 암호화하기 위해 다음 Python 스크립트를 사용합니다:
+```python
+python from cryptography.fernet import Fernet import base64
+# 암호화 키 생성
+key = Fernet.generate_key() print(f"암호화 키: {key.decode()}")
+# 배포 토큰 암호화
+token = "your-deploy-token-here" cipher = Fernet(key) encrypted_token = cipher.encrypt(token.encode()) print(f"암호화된 토큰: {encrypted_token.decode()}")
+```
+
+
+### 3. CI/CD 변수 설정
+
+1. GitLab 그룹 설정 페이지로 이동합니다.
+2. 왼쪽 메뉴에서 "설정 > CI/CD"를 선택합니다.
+3. "변수" 섹션에서 다음 변수를 추가합니다:
+   - `ENCRYPTED_DEPLOY_TOKEN`: 암호화된 배포 토큰
+   - `ENCRYPTION_KEY`: 암호화 키
+   - `DEPLOY_TOKEN_USERNAME`: 배포 토큰 사용자 이름
+   - `BOOKMARK_DATA_GROUP_ID`: 북마크 데이터 그룹 ID
+
 ## CI/CD 파일 구조
 
 ### data-validator/.gitlab-ci.yml
@@ -20,62 +55,55 @@ GitLab Project Mirroring
 
 ```yaml
 include:
-  # Docker 빌드 작업 - data-validator 프로젝트에서만 실행
-  - local: '/docker-build-ci.yml'
-    rules:
-      - if: '$CI_PROJECT_NAME == "data-validator"'
-        when: always
-  
-  # 북마크 검증 작업 - 다른 프로젝트에서만 실행
-  - local: '/validation-ci.yml'
-    rules:
-      - if: '$CI_PROJECT_NAME != "data-validator"'
-        when: always
+# Docker 빌드 작업 - data-validator 프로젝트에서만 실행
+- local: '/docker-build-ci.yml' rules:
+   - if: '$CI_PROJECT_NAME == "data-validator"' when: always
+
+# 북마크 검증 작업 - 다른 프로젝트에서만 실행
+- local: '/validation-ci.yml' rules:
+   - if: '$CI_PROJECT_NAME != "data-validator"' when: always
 ```
+
 
 ### docker-build-ci.yml
 
 이 파일은 Docker 이미지 빌드 및 배포 작업을 포함합니다. 다음 규칙을 적용하여 data-validator 프로젝트에서만 실행되도록 합니다:
-
 ```yaml
 rules:
-  # data-validator 프로젝트에서만 실행
-  - if: '$CI_PROJECT_NAME != "data-validator"'
-    when: never
-  - if: '$CI_COMMIT_BRANCH == "main"'
-    changes:
-      - scripts/validate_bookmarks.py
-      - Dockerfile
-  - if: '$CI_COMMIT_TAG'
-    when: always
+# data-validator 프로젝트에서만 실행
+- if: '$CI_PROJECT_NAME != "data-validator"' when: never
+- if: '$CI_COMMIT_BRANCH == "main"' changes:
+    - scripts/*.py
+    - Dockerfile
+
+- if: '$CI_COMMIT_TAG' when: always
 ```
+
 
 ### validation-ci.yml
 
 이 파일은 북마크 검증 작업을 포함합니다. 다음 규칙을 적용하여 data-validator 프로젝트에서는 실행되지 않고 다른 프로젝트에서만 실행되도록 합니다:
 
 ```yaml
-rules:
-  # data-validator 프로젝트에서는 실행하지 않음
-  - if: '$CI_PROJECT_NAME == "data-validator"'
-    when: never
-  # 머지 리퀘스트에서만 실행
-  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    when: always
+variables:
+  # bookmark-data 그룹 ID 지정
+  # BOOKMARK_DATA_GROUP_ID: (CI/CD 설정에서 설정/실제 그룹 ID로 변경해야 함)
+
+  # 배포 토큰 관련 변수는 CI/CD 설정에서 추가해야 함
+  # ENCRYPTED_DEPLOY_TOKEN: (CI/CD 설정에서 설정)
+  # ENCRYPTION_KEY: (CI/CD 설정에서 설정)
+  # DEPLOY_TOKEN_USERNAME: (CI/CD 설정에서 설정)
 ```
 
 ### 다른 프로젝트의 .gitlab-ci.yml
-
-다른 프로젝트(bookmark-data, application, ops 등)의 .gitlab-ci.yml 파일은 data-validator 프로젝트의 .gitlab-ci.yml 파일을 포함합니다:
-
+다른 프로젝트(bookmark-data, application, ops 등)의 .gitlab-ci.yml 파일은 data-validator 프로젝트의 .gitlab-ci.yml 파일을 포함합니다
 ```yaml
 include:
-  - project: 'sidebar-data/data-validator'
-    file: '/.gitlab-ci.yml'
+- project: 'sidebar-data/data-validator'
+  file: '/.gitlab-ci.yml'
 ```
 
 ## 작업 분리 설명
-
 1. **validate_bookmarks 작업**:
    - data-validator 프로젝트에서는 실행되지 않음
    - 다른 프로젝트에서 머지 리퀘스트가 생성될 때 실행됨
@@ -85,3 +113,11 @@ include:
    - data-validator 프로젝트에서만 실행됨
    - 메인 브랜치에 변경사항이 있거나 태그가 생성될 때 실행됨
    - Docker 이미지를 빌드하고 레지스트리에 배포함
+
+## 검증 규칙
+북마크 데이터는 다음 규칙에 따라 검증됩니다:
+1. 필수 필드: `url`, `name`, `category`, `domain`
+2. URL 중복 없음 (모든 프로젝트에 걸쳐서 검사)
+3. `domain` 필드는 URL의 호스트와 일치해야 함
+4. `category` 값은 또는 형식을 따라야 함 `A/B``A/B/C`
+5. `tags`, `packages` 등의 필드가 있을 경우 반드시 리스트 형식이어야 함

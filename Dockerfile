@@ -1,19 +1,20 @@
+
 FROM python:3.11-alpine
 
-# PyYAML 설치
-RUN pip install pyyaml
+# Install required packages
+RUN pip install pyyaml requests cryptography
 
-# 작업 디렉토리 설정
+# Set working directory
 WORKDIR /app
 
-# 스크립트 복사
-COPY scripts/validate_bookmarks.py /app/validate_bookmarks.py
+# Copy all scripts
+COPY scripts/*.py /app/
 
-# 실행 권한 부여
+# Grant execution permission
 RUN chmod +x /app/validate_bookmarks.py
 
-# 환경 변수 설정 (선택 사항)
+# Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# 진입점 설정 (선택 사항)
+# Set entrypoint
 ENTRYPOINT ["python3", "/app/validate_bookmarks.py"]

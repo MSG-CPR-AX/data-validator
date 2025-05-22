@@ -7,6 +7,14 @@ stages:
 validate_bookmarks:
   stage: validate
   image: registry.gitlab.com/sidebar-data/data-validator:latest
+  variables:
+    # bookmark-data 그룹 ID 지정
+    # BOOKMARK_DATA_GROUP_ID: (CI/CD 설정에서 설정/실제 그룹 ID로 변경해야 함)
+
+    # 배포 토큰 관련 변수는 CI/CD 설정에서 추가해야 함
+    # ENCRYPTED_DEPLOY_TOKEN: (CI/CD 설정에서 설정)
+    # ENCRYPTION_KEY: (CI/CD 설정에서 설정)
+    # DEPLOY_TOKEN_USERNAME: (CI/CD 설정에서 설정)
   script:
     - cd $CI_PROJECT_DIR
     - python3 /app/validate_bookmarks.py
