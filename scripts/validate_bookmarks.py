@@ -12,6 +12,7 @@
 4. categories, tags, packages는 존재할 경우 리스트 형식이어야 함
 5. category 값은 A/B 또는 A/B/C 형식을 따라야 함
 """
+
 import os
 import sys
 import yaml
@@ -108,7 +109,17 @@ def main():
     else:
         print("단독 모드로 실행됩니다. 로컬 YAML 파일만 검증합니다.", file=sys.stderr)
         if in_ci:
-            print("프로젝트 간 검증을 활성화하려면 다음 환경 변수를 설정하세요: CI_SERVER_URL, BOOKMARK_DATA_GROUP_ID, ENCRYPTED_DEPLOY_TOKEN, ENCRYPTION_KEY, DEPLOY_TOKEN_USERNAME", file=sys.stderr)
+            print("프로젝트 간 검증을 활성화하려면 다음 환경 변수를 설정하세요:", file=sys.stderr)
+            required_vars = [
+                'CI_SERVER_URL',
+                'BOOKMARK_DATA_GROUP_ID',
+                'ENCRYPTED_DEPLOY_TOKEN',
+                'ENCRYPTION_KEY',
+                'DEPLOY_TOKEN_USERNAME'
+            ]
+            missing_vars = [var for var in required_vars if not os.environ.get(var)]
+            for var in missing_vars:
+                print(f"⛔ 누락된 환경 변수: {var}", file=sys.stderr)
 
     # YAML 파일을 검색할 현재 디렉토리 가져오기
     current_dir = os.environ.get('CI_PROJECT_DIR', '.')
