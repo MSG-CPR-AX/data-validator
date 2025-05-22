@@ -110,7 +110,10 @@ def main():
         os.environ.get('PAT_ENCRYPTION_KEY')
     ])
 
-    fetch_others = in_ci and os.environ.get('CI_SERVER_URL') and os.environ.get('BOOKMARK_DATA_GROUP_ID') and (has_deploy_token or has_pat)
+    fetch_others = (in_ci
+                    and os.environ.get('CI_SERVER_URL')
+                    and os.environ.get('BOOKMARK_DATA_GROUP_ID')
+                    and (has_deploy_token or has_pat))
 
     if fetch_others:
         auth_method = "PAT" if has_pat else "Deploy Token"
@@ -118,13 +121,15 @@ def main():
     else:
         print("단독 모드로 실행됩니다. 로컬 YAML 파일만 검증합니다.", file=sys.stderr)
         if in_ci:
-            print("프로젝트 간 검증을 활성화하려면 다음 환경 변수를 설정하세요:", file=sys.stderr)
-            print("1. 기본 환경 변수:", file=sys.stderr)
-            print("  - CI_SERVER_URL", file=sys.stderr)
-            print("  - BOOKMARK_DATA_GROUP_ID", file=sys.stderr)
-            print("2. 인증 방법 (하나 이상):", file=sys.stderr)
-            print("  - PAT 방식: ENCRYPTED_PAT, PAT_ENCRYPTION_KEY", file=sys.stderr)
-            print("  - Deploy Token 방식: ENCRYPTED_DEPLOY_TOKEN, ENCRYPTION_KEY, DEPLOY_TOKEN_USERNAME", file=sys.stderr)
+            print(textwrap.dedent(f"""
+                프로젝트 간 검증을 활성화하려면 다음 환경 변수를 설정하세요:
+                1. 기본 환경 변수:
+                  - {ENV_CI_SERVER_URL}
+                  - {ENV_BOOKMARK_DATA_GROUP_ID}
+                2. 인증 방법 (하나 이상):
+                  - PAT 방식: {ENV_ENCRYPTED_PAT}, {ENV_PAT_ENCRYPTION_KEY}
+                  - Deploy Token 방식: {ENV_ENCRYPTED_DEPLOY_TOKEN}, {ENV_ENCRYPTION_KEY}, {ENV_DEPLOY_TOKEN_USERNAME}
+                """).strip(), file=sys.stderr)
 
     # YAML 파일을 검색할 현재 디렉토리 가져오기
     current_dir = os.environ.get('CI_PROJECT_DIR', '.')

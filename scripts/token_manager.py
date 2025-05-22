@@ -126,6 +126,7 @@ def get_token_from_env():
     username = os.environ.get('DEPLOY_TOKEN_USERNAME')
 
     if not all([encrypted_token, encryption_key, username]):
+        print("필수 환경 변수 누락: ENCRYPTED_DEPLOY_TOKEN, ENCRYPTION_KEY, DEPLOY_TOKEN_USERNAME", file=sys.stderr)
         raise ValueError(
             "필수 환경 변수 누락: "
             "ENCRYPTED_DEPLOY_TOKEN, ENCRYPTION_KEY, DEPLOY_TOKEN_USERNAME"
@@ -151,6 +152,7 @@ def get_pat_from_env():
     encryption_key = os.environ.get('PAT_ENCRYPTION_KEY')
 
     if not all([encrypted_pat, encryption_key]):
+        print("PAT에 필요한 환경 변수 누락: ENCRYPTED_PAT, PAT_ENCRYPTION_KEY", file=sys.stderr)
         raise ValueError(
             "PAT에 필요한 환경 변수 누락: "
             "ENCRYPTED_PAT, PAT_ENCRYPTION_KEY"
