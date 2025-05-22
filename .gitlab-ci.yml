@@ -6,10 +6,16 @@ stages:
 validate_bookmarks:
   stage: validate
   image: python:3.11-alpine
+  cache:
+    key: pip-cache
+    paths:
+      - .pip-cache/
   before_script:
+    - pip config set global.cache-dir .pip-cache
     - pip install pyyaml
+    - git clone https://gitlab.com/sidebar-data/data-validator.git /tmp/data-validator || echo "Clone failed, but continuing"
   script:
-    - python3 scripts/validate_bookmarks.py
+    - python3 /tmp/data-validator/scripts/validate_bookmarks.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_PATH != "sidebar-data/data-validator"'
       when: always
