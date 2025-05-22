@@ -15,7 +15,9 @@ GitLab Project Mirroring
 
 북마크 데이터 검증 시스템은 GitLab API에 접근하기 위해 배포 토큰(Deploy Token)을 사용합니다. 배포 토큰은 보안을 위해 암호화되어 저장되고 실행 시에만 복호화됩니다.
 
-### 1. 배포 토큰 생성
+### 1. 토큰 생성
+
+#### 1.1 배포 토큰 생성
 
 1. GitLab 그룹 설정 페이지로 이동합니다.
 2. 왼쪽 메뉴에서 "설정 > 저장소 > 배포 토큰"을 선택합니다.
@@ -24,27 +26,43 @@ GitLab Project Mirroring
    - 범위: `read_repository` 권한만 선택
 4. 생성된 토큰 정보(사용자 이름과 토큰 값)를 안전하게 보관합니다.
 
+#### 1.2 개인 접근 토큰 생성
+
+1. GitLab 개인 설정 페이지로 이동합니다.
+2. 왼쪽 메뉴에서 "접근 토큰"을 선택합니다.
+3. 새 개인 접근 토큰을 생성합니다:
+   - 이름: `bookmark-api-token`
+   - 범위: `api`, `read_api`
+   - 만료일: 필요에 따라 설정
+4. 생성된 토큰 값을 안전하게 보관합니다.
+
 ### 2. 토큰 암호화
 
 토큰을 암호화하기 위해 다음 Python 스크립트를 사용합니다:
 ```python
 python from cryptography.fernet import Fernet import base64
-# 암호화 키 생성
-key = Fernet.generate_key() print(f"암호화 키: {key.decode()}")
 # 배포 토큰 암호화
-token = "your-deploy-token-here" cipher = Fernet(key) encrypted_token = cipher.encrypt(token.encode()) print(f"암호화된 토큰: {encrypted_token.decode()}")
+deploy_key = Fernet.generate_key() print(f"배포 토큰 암호화 키: {deploy_key.decode()}")
+deploy_token = "your-deploy-token-here" cipher = Fernet(deploy_key) encrypted_deploy_token = cipher.encrypt(deploy_token.encode()) print(f"암호화된 배포 토큰: {encrypted_deploy_token.decode()}")
+# PAT 암호화
+pat_key = Fernet.generate_key() print(f"PAT 암호화 키: {pat_key.decode()}")
+pat = "your-personal-access-token-here" cipher = Fernet(pat_key) encrypted_pat = cipher.encrypt(pat.encode()) print(f"암호화된 PAT: {encrypted_pat.decode()}")
 ```
-
 
 ### 3. CI/CD 변수 설정
 
 1. GitLab 그룹 설정 페이지로 이동합니다.
 2. 왼쪽 메뉴에서 "설정 > CI/CD"를 선택합니다.
 3. "변수" 섹션에서 다음 변수를 추가합니다:
-   - `ENCRYPTED_DEPLOY_TOKEN`: 암호화된 배포 토큰
-   - `ENCRYPTION_KEY`: 암호화 키
-   - `DEPLOY_TOKEN_USERNAME`: 배포 토큰 사용자 이름
-   - `BOOKMARK_DATA_GROUP_ID`: 북마크 데이터 그룹 ID
+   - 배포 토큰 관련 변수:
+      - `ENCRYPTED_DEPLOY_TOKEN`: 암호화된 배포 토큰
+      - `ENCRYPTION_KEY`: 배포 토큰 암호화 키
+      - `DEPLOY_TOKEN_USERNAME`: 배포 토큰 사용자 이름
+   - 개인 접근 토큰 관련 변수:
+      - `ENCRYPTED_PAT`: 암호화된 개인 접근 토큰
+      - `PAT_ENCRYPTION_KEY`: PAT 암호화 키
+   - 그룹 정보 변수:
+      - `BOOKMARK_DATA_GROUP_ID`: 북마크 데이터 그룹 ID
 
 ## CI/CD 파일 구조
 
