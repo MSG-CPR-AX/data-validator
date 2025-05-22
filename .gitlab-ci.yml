@@ -14,7 +14,7 @@ validate_bookmarks:
   script:
     - python3 scripts/validate_bookmarks.py
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_PATH != "sidebar-data/data-validator"'
       when: always
 
 # Docker 이미지 빌드 작업
