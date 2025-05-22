@@ -16,6 +16,9 @@ validate_bookmarks:
     # ENCRYPTION_KEY: (CI/CD 설정에서 설정)
     # DEPLOY_TOKEN_USERNAME: (CI/CD 설정에서 설정)
   script:
+    - echo "CI_PROJECT_DIR=$CI_PROJECT_DIR"
+    - ls -al $CI_PROJECT_DIR
+    - find $CI_PROJECT_DIR -name "*.yml"
     - cd $CI_PROJECT_DIR
     - python3 /app/validate_bookmarks.py
   rules:
