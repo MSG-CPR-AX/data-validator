@@ -1,0 +1,15 @@
+# GitLab CI/CD configuration for bookmark validation
+
+stages:
+  - validate
+
+validate_bookmarks:
+  stage: validate
+  image: python:3.11-alpine
+  before_script:
+    - pip install pyyaml
+  script:
+    - python3 scripts/validate_bookmarks.py
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
