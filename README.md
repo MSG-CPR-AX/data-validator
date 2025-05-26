@@ -40,13 +40,28 @@ GitLab Project Mirroring
 
 토큰을 암호화하기 위해 다음 Python 스크립트를 사용합니다:
 ```python
-python from cryptography.fernet import Fernet import base64
+from cryptography.fernet import Fernet
+import base64
+
+# 배포 토큰 암호화 키 생성
+deploy_token_key = Fernet.generate_key()
+print(f"배포 토큰 암호화 키: {key.decode()}")
+
 # 배포 토큰 암호화
-deploy_key = Fernet.generate_key() print(f"배포 토큰 암호화 키: {deploy_key.decode()}")
-deploy_token = "your-deploy-token-here" cipher = Fernet(deploy_key) encrypted_deploy_token = cipher.encrypt(deploy_token.encode()) print(f"암호화된 배포 토큰: {encrypted_deploy_token.decode()}")
+deploy_token = "example"
+cipher = Fernet(deploy_token_key)
+encrypted_token = cipher.encrypt(deploy_token.encode())
+print(f"배포 토큰 암호화된 토큰: {encrypted_token.decode()}")
+
+# PAT 암호화 키 생성
+pat_key = Fernet.generate_key()
+print(f"PAT 암호화 키: {key.decode()}")
+
 # PAT 암호화
-pat_key = Fernet.generate_key() print(f"PAT 암호화 키: {pat_key.decode()}")
-pat = "your-personal-access-token-here" cipher = Fernet(pat_key) encrypted_pat = cipher.encrypt(pat.encode()) print(f"암호화된 PAT: {encrypted_pat.decode()}")
+pat = "example"
+cipher = Fernet(pat_key)
+encrypted_pat = cipher.encrypt(pat.encode())
+print(f"암호화된 PAT: {encrypted_pat.decode()}")
 ```
 
 ### 3. CI/CD 변수 설정

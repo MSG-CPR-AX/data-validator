@@ -44,8 +44,7 @@ def encrypt_token(token, key=None):
 
     return encrypted_token, key
 
-def decrypt_token(encrypted_token, key):
-    """
+"""
     암호화된 토큰을 복호화합니다.
 
     매개변수:
@@ -55,16 +54,33 @@ def decrypt_token(encrypted_token, key):
     반환값:
         str: 복호화된 토큰
     """
-    if isinstance(key, str):
-        key = key.encode()
+def decrypt_token(encrypted_token, key):
+    try:
+        if isinstance(key, str):
+            key = key.encode()
 
-    if isinstance(encrypted_token, str):
-        encrypted_token = encrypted_token.encode()
+        if isinstance(encrypted_token, str):
+            encrypted_token = encrypted_token.encode()
 
-    cipher = Fernet(key)
-    decrypted_token = cipher.decrypt(encrypted_token).decode()
+        cipher = Fernet(key)
+        decrypted_token = cipher.decrypt(encrypted_token).decode()
 
-    return decrypted_token
+        return decrypted_token
+    except Exception as e:
+        import sys
+        print(f"토큰 복호화 중 오류 발생: {type(e).__name__}", file=sys.stderr)
+        print(f"오류 세부 정보: {str(e)}", file=sys.stderr)
+
+        # 암호화 토큰 디버깅 정보 (앞 10자만 표시하여 보안 유지)
+        token_prefix = str(encrypted_token)[:10] + "..." if encrypted_token else "None"
+        print(f"암호화 토큰 접두사: {token_prefix}", file=sys.stderr)
+
+        # 키 디버깅 정보 (앞 10자만 표시하여 보안 유지)
+        key_prefix = str(key)[:10] + "..." if key else "None"
+        print(f"키 접두사: {key_prefix}", file=sys.stderr)
+
+        # 복호화 실패 시 ValueError로 래핑하여 던짐
+        raise ValueError(f"토큰 복호화 실패: {type(e).__name__} - {str(e)}")
 
 def get_deploy_token_headers(username, token):
     """
