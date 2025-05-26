@@ -15,12 +15,30 @@
 
 import os
 import sys
-import yaml
+import logging
+import textwrap
 
 # 사용자 정의 모듈 임포트
 from token_manager import get_auth_headers_from_env
 from fetch_projects import fetch_all_bookmarks
 from yaml_validator import validate_bookmarks, load_current_project_bookmarks
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stderr)]
+)
+logger = logging.getLogger(__name__)
+
+# 환경 변수 상수
+ENV_CI_SERVER_URL = 'CI_SERVER_URL'
+ENV_BOOKMARK_DATA_GROUP_ID = 'BOOKMARK_DATA_GROUP_ID'
+ENV_ENCRYPTED_PAT = 'ENCRYPTED_PAT'
+ENV_PAT_ENCRYPTION_KEY = 'PAT_ENCRYPTION_KEY'
+ENV_ENCRYPTED_DEPLOY_TOKEN = 'ENCRYPTED_DEPLOY_TOKEN'
+ENV_ENCRYPTION_KEY = 'ENCRYPTION_KEY'
+ENV_DEPLOY_TOKEN_USERNAME = 'DEPLOY_TOKEN_USERNAME'
 
 def validate_bookmarks_data(current_dir, fetch_others=True):
     """
@@ -63,16 +81,16 @@ def validate_bookmarks_data(current_dir, fetch_others=True):
                 # API 호출을 위한 인증 헤더 가져오기 (PAT 우선)
                 headers = get_auth_headers_from_env(for_api=True)
 
-                print(f"그룹 {group_id} 내 다른 프로젝트에서 북마크를 가져오는 중...", file=sys.stderr)
+                logger.info("그룹 %s 내 다른 프로젝트에서 북마크를 가져오는 중...", group_id)
                 other_bookmarks = fetch_all_bookmarks(gitlab_url, headers, group_id, current_project_id)
-                print(f"다른 프로젝트에서 {len(other_bookmarks)}개의 북마크를 찾았습니다.", file=sys.stderr)
+                logger.info("다른 프로젝트에서 %s개의 북마크를 찾았습니다.", len(other_bookmarks))
 
                 all_bookmarks.extend(other_bookmarks)
             except Exception as e:
-                print(f"다른 프로젝트에서 북마크를 가져오는 중 오류 발생: {str(e)}", file=sys.stderr)
+                logger.error("다른 프로젝트에서 북마크를 가져오는 중 오류 발생: %s", str(e))
                 has_errors = True
         else:
-            print("경고: 다른 프로젝트의 북마크를 가져올 수 없습니다. 필요한 환경 변수가 누락되었습니다.", file=sys.stderr)
+            logger.warning("경고: 다른 프로젝트의 북마크를 가져올 수 없습니다. 필요한 환경 변수가 누락되었습니다.")
             missing_vars = []
             if not gitlab_url:
                 missing_vars.append("CI_SERVER_URL")
@@ -80,17 +98,17 @@ def validate_bookmarks_data(current_dir, fetch_others=True):
                 missing_vars.append("BOOKMARK_DATA_GROUP_ID")
             if not has_deploy_token and not has_pat:
                 missing_vars.append("인증 토큰 관련 변수 (ENCRYPTED_PAT/PAT_ENCRYPTION_KEY 또는 ENCRYPTED_DEPLOY_TOKEN/ENCRYPTION_KEY/DEPLOY_TOKEN_USERNAME)")
-            print(f"누락된 변수: {', '.join(missing_vars)}", file=sys.stderr)
+            logger.warning("누락된 변수: %s", ', '.join(missing_vars))
 
     # 수집된 모든 북마크 검증
     validation_errors = validate_bookmarks(all_bookmarks)
     has_errors = has_errors or validation_errors
 
     if has_errors:
-        print("검증 실패. 위 오류를 확인하세요.", file=sys.stderr)
+        logger.error("검증 실패. 위 오류를 확인하세요.")
         return 1
 
-    print(f"검증 성공. 총 {len(all_bookmarks)}개의 북마크를 찾았습니다.")
+    logger.info("검증 성공. 총 %s개의 북마크를 찾았습니다.", len(all_bookmarks))
     return 0
 
 def main():
@@ -117,11 +135,11 @@ def main():
 
     if fetch_others:
         auth_method = "PAT" if has_pat else "Deploy Token"
-        print(f"CI 환경에서 GitLab API 접근 가능 ({auth_method} 사용). 모든 프로젝트의 북마크를 검증합니다.", file=sys.stderr)
+        logger.info("CI 환경에서 GitLab API 접근 가능 (%s 사용). 모든 프로젝트의 북마크를 검증합니다.", auth_method)
     else:
-        print("단독 모드로 실행됩니다. 로컬 YAML 파일만 검증합니다.", file=sys.stderr)
+        logger.info("단독 모드로 실행됩니다. 로컬 YAML 파일만 검증합니다.")
         if in_ci:
-            print(textwrap.dedent(f"""
+            logger.info(textwrap.dedent(f"""
                 프로젝트 간 검증을 활성화하려면 다음 환경 변수를 설정하세요:
                 1. 기본 환경 변수:
                   - {ENV_CI_SERVER_URL}
@@ -129,7 +147,7 @@ def main():
                 2. 인증 방법 (하나 이상):
                   - PAT 방식: {ENV_ENCRYPTED_PAT}, {ENV_PAT_ENCRYPTION_KEY}
                   - Deploy Token 방식: {ENV_ENCRYPTED_DEPLOY_TOKEN}, {ENV_ENCRYPTION_KEY}, {ENV_DEPLOY_TOKEN_USERNAME}
-                """).strip(), file=sys.stderr)
+                """).strip())
 
     # YAML 파일을 검색할 현재 디렉토리 가져오기
     current_dir = os.environ.get('CI_PROJECT_DIR', '.')

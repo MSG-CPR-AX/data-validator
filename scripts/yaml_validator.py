@@ -19,8 +19,13 @@ YAML 북마크 유효성 검사기
 """
 
 import re
-import sys
+import os
+import logging
+import yaml
 from urllib.parse import urlparse
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
 
 def validate_bookmarks(bookmarks):
     """
@@ -59,7 +64,7 @@ def validate_bookmarks(bookmarks):
         required_fields = ['url', 'name', 'category', 'domain']
         for field in required_fields:
             if field not in bookmark_copy:
-                print(f"❌ {location} - 필수 필드 '{field}' 누락", file=sys.stderr)
+                logger.error("❌ %s - 필수 필드 '%s' 누락", location, field)
                 has_errors = True
 
         # 필수 필드 중 하나라도 없으면 추가 검사 생략
@@ -69,7 +74,7 @@ def validate_bookmarks(bookmarks):
         # URL 중복 검사
         url = bookmark_copy['url']
         if url in all_urls:
-            print(f"❌ {location} - 중복된 URL '{url}'", file=sys.stderr)
+            logger.error("❌ %s - 중복된 URL '%s'", location, url)
             has_errors = True
         else:
             all_urls.add(url)
@@ -78,22 +83,24 @@ def validate_bookmarks(bookmarks):
         try:
             parsed_url = urlparse(url)
             if parsed_url.netloc != bookmark_copy['domain']:
-                print(f"❌ {location} - 도메인 '{bookmark_copy['domain']}'가 URL 호스트 '{parsed_url.netloc}'와 일치하지 않음", file=sys.stderr)
+                logger.error("❌ %s - 도메인 '%s'가 URL 호스트 '%s'와 일치하지 않음", 
+                             location, bookmark_copy['domain'], parsed_url.netloc)
                 has_errors = True
         except Exception as e:
-            print(f"❌ {location} - 잘못된 URL '{url}': {str(e)}", file=sys.stderr)
+            logger.error("❌ %s - 잘못된 URL '%s': %s", location, url, str(e))
             has_errors = True
 
         # category 형식 검사
         if not category_pattern.match(bookmark_copy['category']):
-            print(f"❌ {location} - category '{bookmark_copy['category']}'는 'A/B' 또는 'A/B/C' 형식을 따라야 합니다.", file=sys.stderr)
+            logger.error("❌ %s - category '%s'는 'A/B' 또는 'A/B/C' 형식을 따라야 합니다.", 
+                         location, bookmark_copy['category'])
             has_errors = True
 
         # 리스트 필드 검사
         list_fields = ['tags', 'packages']
         for field in list_fields:
             if field in bookmark_copy and not isinstance(bookmark_copy[field], list):
-                print(f"❌ {location} - 필드 '{field}'는 리스트여야 합니다.", file=sys.stderr)
+                logger.error("❌ %s - 필드 '%s'는 리스트여야 합니다.", location, field)
                 has_errors = True
 
     return has_errors
@@ -108,11 +115,10 @@ def find_yaml_files(base_dir):
     반환값:
         list: YAML 파일 경로 리스트
     """
-    import os
     yaml_files = []
 
     if not os.path.exists(base_dir):
-        print(f"⚠️  경고: 디렉토리 {base_dir} 가 존재하지 않습니다.", file=sys.stderr)
+        logger.warning("⚠️  경고: 디렉토리 %s 가 존재하지 않습니다.", base_dir)
         return yaml_files
 
     for root, _, files in os.walk(base_dir):
@@ -134,7 +140,6 @@ def load_yaml_file(yaml_file):
     반환값:
         tuple: (북마크 리스트, 오류 여부)
     """
-    import yaml
     bookmarks = []
     has_errors = False
 
@@ -143,17 +148,17 @@ def load_yaml_file(yaml_file):
             try:
                 yaml_content = yaml.safe_load(f)
                 if not yaml_content:
-                    print(f"ℹ️  정보: 빈 파일 또는 북마크가 없는 YAML 파일 생략: {yaml_file}", file=sys.stderr)
+                    logger.info("ℹ️  정보: 빈 파일 또는 북마크가 없는 YAML 파일 생략: %s", yaml_file)
                     return bookmarks, has_errors
 
                 if not isinstance(yaml_content, list):
-                    print(f"❌ {yaml_file} - 루트 요소는 리스트여야 합니다.", file=sys.stderr)
+                    logger.error("❌ %s - 루트 요소는 리스트여야 합니다.", yaml_file)
                     has_errors = True
                     return bookmarks, has_errors
 
                 for i, bookmark in enumerate(yaml_content):
                     if not isinstance(bookmark, dict):
-                        print(f"❌ {yaml_file}, 항목 {i+1} - 북마크는 딕셔너리여야 합니다.", file=sys.stderr)
+                        logger.error("❌ %s, 항목 %s - 북마크는 딕셔너리여야 합니다.", yaml_file, i+1)
                         has_errors = True
                         continue
 
@@ -165,10 +170,10 @@ def load_yaml_file(yaml_file):
                     bookmarks.append(bookmark)
 
             except yaml.YAMLError as e:
-                print(f"❌ {yaml_file} 파싱 오류: {str(e)}", file=sys.stderr)
+                logger.error("❌ %s 파싱 오류: %s", yaml_file, str(e))
                 has_errors = True
     except Exception as e:
-        print(f"❌ {yaml_file} 읽기 오류: {str(e)}", file=sys.stderr)
+        logger.error("❌ %s 읽기 오류: %s", yaml_file, str(e))
         has_errors = True
 
     return bookmarks, has_errors
@@ -185,10 +190,10 @@ def load_current_project_bookmarks(current_dir):
     """
     yaml_files = find_yaml_files(current_dir)
     if not yaml_files:
-        print(f"⚠️  {current_dir} 에서 YAML 파일을 찾을 수 없습니다.", file=sys.stderr)
+        logger.warning("⚠️  %s 에서 YAML 파일을 찾을 수 없습니다.", current_dir)
         return [], False
 
-    print(f"🔍 현재 프로젝트에서 {len(yaml_files)}개의 YAML 파일을 찾았습니다.", file=sys.stderr)
+    logger.info("🔍 현재 프로젝트에서 %s개의 YAML 파일을 찾았습니다.", len(yaml_files))
 
     all_bookmarks = []
     has_errors = False

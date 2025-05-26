@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 GitLab 프로젝트 및 파일 수집기
@@ -18,12 +19,14 @@ GitLab 프로젝트 및 파일 수집기
     # 프로젝트 내 YAML 파일 가져오기
     yaml_files = fetch_project_yaml_files(gitlab_url, headers, project_id)
 """
-
-import sys
+import logging
 import yaml
 import requests
 from urllib.parse import quote
 from token_manager import get_auth_headers_from_env
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
 
 def fetch_group_projects(gitlab_url, headers, group_id, exclude_project_id=None):
     """
@@ -50,8 +53,8 @@ def fetch_group_projects(gitlab_url, headers, group_id, exclude_project_id=None)
     )
 
     if projects_response.status_code != 200:
-        print(f"❌ 프로젝트 목록 조회 실패: {projects_response.status_code}", file=sys.stderr)
-        print(f"응답 내용: {projects_response.text}", file=sys.stderr)
+        logger.error("❌ 프로젝트 목록 조회 실패: %s", projects_response.status_code)
+        logger.error("응답 내용: %s", projects_response.text)
         return []
 
     projects = projects_response.json()
@@ -92,8 +95,8 @@ def fetch_project_yaml_files(gitlab_url, headers, project_id, project_path=None)
     )
 
     if tree_response.status_code != 200:
-        print(f"❌ 프로젝트 {project_path}의 파일 목록 조회 실패: {tree_response.status_code}", file=sys.stderr)
-        print(f"응답 내용: {tree_response.text}", file=sys.stderr)
+        logger.error("❌ 프로젝트 %s의 파일 목록 조회 실패: %s", project_path, tree_response.status_code)
+        logger.error("응답 내용: %s", tree_response.text)
         return []
 
     files = tree_response.json()
@@ -114,7 +117,7 @@ def fetch_project_yaml_files(gitlab_url, headers, project_id, project_path=None)
         )
 
         if file_response.status_code != 200:
-            print(f"⚠️  파일 {file_path} 내용 조회 실패: {file_response.status_code}", file=sys.stderr)
+            logger.warning("⚠️  파일 %s 내용 조회 실패: %s", file_path, file_response.status_code)
             continue
 
         try:
@@ -131,7 +134,7 @@ def fetch_project_yaml_files(gitlab_url, headers, project_id, project_path=None)
                     item['_source_file'] = file_path
                     bookmarks.append(item)
         except yaml.YAMLError as e:
-            print(f"⚠️  YAML 파싱 오류 - {project_path}/{file_path}: {str(e)}", file=sys.stderr)
+            logger.warning("⚠️  YAML 파싱 오류 - %s/%s: %s", project_path, file_path, str(e))
 
     return bookmarks
 
@@ -152,16 +155,16 @@ def fetch_all_bookmarks(gitlab_url, headers, group_id, exclude_project_id=None):
 
     # 그룹 내 프로젝트 목록 조회
     projects = fetch_group_projects(gitlab_url, headers, group_id, exclude_project_id)
-    print(f"📦 그룹 {group_id} 내 프로젝트 수: {len(projects)}", file=sys.stderr)
+    logger.info("📦 그룹 %s 내 프로젝트 수: %s", group_id, len(projects))
 
     # 각 프로젝트에서 YAML 파일 수집
     for project in projects:
         project_id = project['id']
         project_path = project['path_with_namespace']
-        print(f"📁 프로젝트에서 YAML 수집 중: {project_path}", file=sys.stderr)
+        logger.info("📁 프로젝트에서 YAML 수집 중: %s", project_path)
 
         project_bookmarks = fetch_project_yaml_files(gitlab_url, headers, project_id, project_path)
-        print(f"✅ {project_path} 에서 {len(project_bookmarks)}개의 북마크 발견", file=sys.stderr)
+        logger.info("✅ %s 에서 %s개의 북마크 발견", project_path, len(project_bookmarks))
 
         all_bookmarks.extend(project_bookmarks)
 

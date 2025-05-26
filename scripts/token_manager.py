@@ -19,6 +19,7 @@ API 인증 헤더를 생성하는 기능을 제공합니다.
 """
 
 import os
+import sys
 import base64
 from cryptography.fernet import Fernet
 
@@ -44,7 +45,8 @@ def encrypt_token(token, key=None):
 
     return encrypted_token, key
 
-"""
+def decrypt_token(encrypted_token, key):
+    """
     암호화된 토큰을 복호화합니다.
 
     매개변수:
@@ -54,7 +56,6 @@ def encrypt_token(token, key=None):
     반환값:
         str: 복호화된 토큰
     """
-def decrypt_token(encrypted_token, key):
     try:
         if isinstance(key, str):
             key = key.encode()
@@ -67,7 +68,6 @@ def decrypt_token(encrypted_token, key):
 
         return decrypted_token
     except Exception as e:
-        import sys
         print(f"토큰 복호화 중 오류 발생: {type(e).__name__}", file=sys.stderr)
         print(f"오류 세부 정보: {str(e)}", file=sys.stderr)
 
