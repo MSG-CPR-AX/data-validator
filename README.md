@@ -45,7 +45,7 @@ import base64
 
 # 배포 토큰 암호화 키 생성
 deploy_token_key = Fernet.generate_key()
-print(f"배포 토큰 암호화 키: {key.decode()}")
+print(f"배포 토큰 암호화 키: {deploy_token_key.decode()}")
 
 # 배포 토큰 암호화
 deploy_token = "example"
@@ -55,7 +55,7 @@ print(f"배포 토큰 암호화된 토큰: {encrypted_token.decode()}")
 
 # PAT 암호화 키 생성
 pat_key = Fernet.generate_key()
-print(f"PAT 암호화 키: {key.decode()}")
+print(f"PAT 암호화 키: {pat_key.decode()}")
 
 # PAT 암호화
 pat = "example"
@@ -88,13 +88,17 @@ print(f"암호화된 PAT: {encrypted_pat.decode()}")
 
 ```yaml
 include:
-# Docker 빌드 작업 - data-validator 프로젝트에서만 실행
-- local: '/docker-build-ci.yml' rules:
-   - if: '$CI_PROJECT_NAME == "data-validator"' when: always
+  # Docker 빌드 작업 - data-validator 프로젝트에서만 실행
+  - local: '/docker-build-ci.yml'
+    rules:
+      - if: '$CI_PROJECT_NAME == "data-validator"'
+        when: always
 
-# 북마크 검증 작업 - 다른 프로젝트에서만 실행
-- local: '/validation-ci.yml' rules:
-   - if: '$CI_PROJECT_NAME != "data-validator"' when: always
+  # 북마크 검증 작업 - 다른 프로젝트에서만 실행
+  - local: '/validation-ci.yml'
+    rules:
+      - if: '$CI_PROJECT_NAME != "data-validator"'
+        when: always
 ```
 
 
@@ -103,13 +107,15 @@ include:
 이 파일은 Docker 이미지 빌드 및 배포 작업을 포함합니다. 다음 규칙을 적용하여 data-validator 프로젝트에서만 실행되도록 합니다:
 ```yaml
 rules:
-# data-validator 프로젝트에서만 실행
-- if: '$CI_PROJECT_NAME != "data-validator"' when: never
-- if: '$CI_COMMIT_BRANCH == "main"' changes:
-    - scripts/*.py
-    - Dockerfile
-
-- if: '$CI_COMMIT_TAG' when: always
+  # data-validator 프로젝트에서만 실행
+  - if: '$CI_PROJECT_NAME != "data-validator"'
+    when: never
+  - if: '$CI_COMMIT_BRANCH == "main"'
+    changes:
+      - scripts/*.py
+      - Dockerfile
+  - if: '$CI_COMMIT_TAG'
+    when: always
 ```
 
 
@@ -149,8 +155,78 @@ include:
 
 ## 검증 규칙
 북마크 데이터는 다음 규칙에 따라 검증됩니다:
-1. 필수 필드: `url`, `name`, `category`, `domain`
+1. 필수 필드: `url`, `name`, `domain`, `category`, `packages`
 2. URL 중복 없음 (모든 프로젝트에 걸쳐서 검사)
 3. `domain` 필드는 URL의 호스트와 일치해야 함
-4. `category` 값은 또는 형식을 따라야 함 `A/B``A/B/C`
-5. `tags`, `packages` 등의 필드가 있을 경우 반드시 리스트 형식이어야 함
+4. `packages`는 `key`와 `children`을 가진 객체의 리스트여야 함 (빈 리스트 허용)
+5. `meta` 필드는 선택적이며 추가 속성을 허용함
+
+## JSON Schema 검증
+북마크 데이터는 `bookmark-schema/bookmark.schema.json` 파일에 정의된 JSON Schema를 사용하여 검증됩니다. 이 스키마는 다음과 같은 구조를 가집니다:
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["name", "url", "domain", "category", "packages"],
+    "properties": {
+      "name": { "type": "string" },
+      "url": { "type": "string", "format": "uri" },
+      "domain": { "type": "string" },
+      "category": { "type": "string" },
+      "packages": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/packageNode" },
+        "default": []
+      },
+      "meta": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": false
+  },
+  "definitions": {
+    "packageNode": {
+      "type": "object",
+      "required": ["key", "children"],
+      "properties": {
+        "key": { "type": "string" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/packageNode" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+## 예제 YAML 형식
+
+유효한 북마크 예제:
+
+```yaml
+- name: "GitLab Docs"
+  url: "https://docs.gitlab.com"
+  domain: "docs.gitlab.com"
+  category: "DevOps/GitLab"
+  packages:
+    - key: "공통"
+      children:
+        - key: "문서"
+          children: []
+  meta:
+    owner: "DevOps Team"
+    lastReviewed: "2023-05-20"
+
+# 최소 필수 필드만 포함한 예제
+- name: "Google"
+  url: "https://www.google.com"
+  domain: "www.google.com"
+  category: "Search/Engine"
+  packages: []
+```

@@ -2,10 +2,13 @@
 FROM python:3.11-alpine
 
 # Install required packages
-RUN pip install pyyaml requests cryptography
+RUN pip install pyyaml requests cryptography jsonschema
 
 # Set working directory
 WORKDIR /app
+
+# Create directory for schema
+RUN mkdir -p /app/bookmark-schema
 
 # Copy all scripts
 COPY scripts/*.py /app/

@@ -5,11 +5,11 @@ YAML 북마크 유효성 검사기
 이 모듈은 북마크 YAML 데이터가 요구되는 형식과 제약 조건을 만족하는지 검사하는 기능을 제공합니다.
 
 검사 규칙:
-1. 필수 필드: url, name, category, domain
+1. 필수 필드: url, name, domain, category, packages
 2. 모든 파일(다른 프로젝트 포함)에서 URL 중복 금지
 3. domain 필드는 URL의 호스트와 일치해야 함
-4. categories, tags, packages 필드는 존재할 경우 리스트여야 함
-5. category 값은 A/B 또는 A/B/C 형식을 따라야 함
+4. packages는 key와 children을 가진 객체의 리스트여야 함 (빈 리스트 허용)
+5. meta 필드는 선택적이며 추가 속성을 허용함
 
 사용 예:
     from yaml_validator import validate_bookmarks
@@ -22,10 +22,83 @@ import re
 import os
 import logging
 import yaml
+import json
+import jsonschema
 from urllib.parse import urlparse
+from pathlib import Path
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
+
+def load_schema():
+    """
+    JSON Schema를 로드합니다.
+
+    반환값:
+        dict: 로드된 JSON Schema
+    """
+    # 먼저 현재 디렉토리에서 스키마 파일 찾기
+    schema_paths = [
+        # 현재 디렉토리 기준 상대 경로
+        "bookmark-schema/bookmark.schema.json",
+        # 프로젝트 루트 기준 상대 경로
+        "../../../bookmark-schema/bookmark.schema.json",
+        # CI 환경에서의 경로
+        os.environ.get('CI_PROJECT_DIR', '') + "/bookmark-schema/bookmark.schema.json" if 'CI_PROJECT_DIR' in os.environ else None
+    ]
+
+    # None 값 제거
+    schema_paths = [p for p in schema_paths if p]
+
+    for schema_path in schema_paths:
+        if os.path.exists(schema_path):
+            try:
+                with open(schema_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error("❌ 스키마 파일 '%s' 로드 오류: %s", schema_path, str(e))
+                break
+
+    # 스키마 파일을 찾지 못한 경우 기본 스키마 반환
+    logger.warning("⚠️ 스키마 파일을 찾을 수 없어 기본 스키마를 사용합니다.")
+    return {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["name", "url", "domain", "category", "packages"],
+            "properties": {
+                "name": {"type": "string"},
+                "url": {"type": "string", "format": "uri"},
+                "domain": {"type": "string"},
+                "category": {"type": "string"},
+                "packages": {
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/packageNode"},
+                    "default": []
+                },
+                "meta": {
+                    "type": "object",
+                    "additionalProperties": True
+                }
+            },
+            "additionalProperties": False
+        },
+        "definitions": {
+            "packageNode": {
+                "type": "object",
+                "required": ["key", "children"],
+                "properties": {
+                    "key": {"type": "string"},
+                    "children": {
+                        "type": "array",
+                        "items": {"$ref": "#/definitions/packageNode"}
+                    }
+                },
+                "additionalProperties": False
+            }
+        }
+    }
 
 def validate_bookmarks(bookmarks):
     """
@@ -40,9 +113,11 @@ def validate_bookmarks(bookmarks):
     has_errors = False
     all_urls = set()
 
-    # category는 A/B 또는 A/B/C 형식만 허용
-    category_pattern = re.compile(r'^[^/]+/[^/]+(/[^/]+)?$')
+    # JSON Schema 로드
+    schema = load_schema()
 
+    # 북마크 메타데이터 제거 및 URL 중복 검사
+    clean_bookmarks = []
     for bookmark in bookmarks:
         source_file = bookmark.get('_source_file', 'unknown')
         source_project = bookmark.get('_source_project', 'unknown')
@@ -60,48 +135,44 @@ def validate_bookmarks(bookmarks):
             if meta_field in bookmark_copy:
                 del bookmark_copy[meta_field]
 
-        # 필수 필드 존재 여부 검사
-        required_fields = ['url', 'name', 'category', 'domain']
-        for field in required_fields:
-            if field not in bookmark_copy:
-                logger.error("❌ %s - 필수 필드 '%s' 누락", location, field)
-                has_errors = True
-
-        # 필수 필드 중 하나라도 없으면 추가 검사 생략
-        if not all(field in bookmark_copy for field in required_fields):
-            continue
-
         # URL 중복 검사
-        url = bookmark_copy['url']
-        if url in all_urls:
-            logger.error("❌ %s - 중복된 URL '%s'", location, url)
-            has_errors = True
-        else:
-            all_urls.add(url)
+        if 'url' in bookmark_copy:
+            url = bookmark_copy['url']
+            if url in all_urls:
+                logger.error("❌ %s - 중복된 URL '%s'", location, url)
+                has_errors = True
+            else:
+                all_urls.add(url)
 
         # domain 필드가 URL 호스트와 일치하는지 검사
+        if 'url' in bookmark_copy and 'domain' in bookmark_copy:
+            try:
+                parsed_url = urlparse(bookmark_copy['url'])
+                if parsed_url.netloc != bookmark_copy['domain']:
+                    logger.error("❌ %s - 도메인 '%s'가 URL 호스트 '%s'와 일치하지 않음", 
+                                location, bookmark_copy['domain'], parsed_url.netloc)
+                    has_errors = True
+            except Exception as e:
+                logger.error("❌ %s - 잘못된 URL '%s': %s", location, bookmark_copy.get('url', ''), str(e))
+                has_errors = True
+
+        # 북마크 객체에 위치 정보 추가 (오류 메시지용)
+        bookmark_copy['_location'] = location
+        clean_bookmarks.append(bookmark_copy)
+
+    # JSON Schema 검증
+    for bookmark in clean_bookmarks:
+        location = bookmark.pop('_location', 'unknown')
         try:
-            parsed_url = urlparse(url)
-            if parsed_url.netloc != bookmark_copy['domain']:
-                logger.error("❌ %s - 도메인 '%s'가 URL 호스트 '%s'와 일치하지 않음", 
-                             location, bookmark_copy['domain'], parsed_url.netloc)
-                has_errors = True
-        except Exception as e:
-            logger.error("❌ %s - 잘못된 URL '%s': %s", location, url, str(e))
+            jsonschema.validate(instance=[bookmark], schema=schema)
+        except jsonschema.exceptions.ValidationError as e:
+            # 검증 오류 메시지 출력
+            error_path = '.'.join(str(p) for p in e.path)
+            if error_path:
+                logger.error("❌ %s - JSON Schema 검증 오류: %s (%s)", location, e.message, error_path)
+            else:
+                logger.error("❌ %s - JSON Schema 검증 오류: %s", location, e.message)
             has_errors = True
-
-        # category 형식 검사
-        if not category_pattern.match(bookmark_copy['category']):
-            logger.error("❌ %s - category '%s'는 'A/B' 또는 'A/B/C' 형식을 따라야 합니다.", 
-                         location, bookmark_copy['category'])
-            has_errors = True
-
-        # 리스트 필드 검사
-        list_fields = ['tags', 'packages']
-        for field in list_fields:
-            if field in bookmark_copy and not isinstance(bookmark_copy[field], list):
-                logger.error("❌ %s - 필드 '%s'는 리스트여야 합니다.", location, field)
-                has_errors = True
 
     return has_errors
 
