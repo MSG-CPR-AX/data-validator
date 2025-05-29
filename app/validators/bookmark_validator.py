@@ -27,19 +27,12 @@
     # 현재 프로젝트의 북마크 로드 및 검증
     bookmarks, has_errors = validator.load_current_project_bookmarks(current_dir)
 """
-
-import re
 import os
 import logging
-import yaml
-import json
-import jsonschema
-from urllib.parse import urlparse
 
-from app.integrations.gitlab_fetcher import GitLabBookmarkFetcher
-from app.loaders.bookmark_loader import load_current_project_bookmarks
+from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
+from app.gitlab_utils.gitlab_fetcher import GitLabBookmarkFetcher
 from app.schemas.data_schema import BookmarkJsonSchema
-from pathlib import Path
 
 from app.gitlab_utils.gitlab_constants import GitLabEnvVariables
 
@@ -52,7 +45,7 @@ class BookmarkValidator:
     북마크 YAML 데이터의 유효성을 검사하는 클래스
     """
 
-    def __init__(self, schema=None):
+    def __init__(self, schema=None, authenticator=None):
         """
         BookmarkValidator 초기화
 
@@ -64,9 +57,14 @@ class BookmarkValidator:
         else:
             self.schema = schema
 
-        self.fetcher = GitLabBookmarkFetcher()
+        if authenticator is None:
+            self.authenticator = GitLabAuthenticator()
+        else:
+            self.authenticator = authenticator
 
-    def validate_bookmarks_data(self, current_dir):
+        self.fetcher = GitLabBookmarkFetcher(self.authenticator)
+
+    def validate_bookmarks_data(self):
         """
         북마크 데이터를 검증하는 메서드입니다.
 
@@ -82,36 +80,21 @@ class BookmarkValidator:
         반환값:
             int: 성공 시 0, 실패 시 1
         """
-        # 현재 프로젝트에서 북마크 로드
-        current_bookmarks, has_errors = load_current_project_bookmarks(current_dir)
-
-        all_bookmarks = current_bookmarks
-
         # 요청된 경우 다른 프로젝트에서 북마크를 가져옴
         gitlab_url = os.environ.get(GitLabEnvVariables.CI_SERVER_URL)
         group_id = os.environ.get(GitLabEnvVariables.BOOKMARK_DATA_GROUP_ID)
-        current_project_id = os.environ.get('CI_PROJECT_ID')
 
         # 환경 변수 확인 - 기본 인증 변수와 PAT 변수 함께 확인
-        has_deploy_token = all([
-            os.environ.get(GitLabEnvVariables.ENCRYPTED_DEPLOY_TOKEN),
-            os.environ.get(GitLabEnvVariables.ENCRYPTION_KEY),
-            os.environ.get(GitLabEnvVariables.DEPLOY_TOKEN_USERNAME)
-        ])
+        has_deploy_token = self.authenticator.has_deploy_token()
+        has_pat = self.authenticator.has_pat()
 
-        has_pat = all([
-            os.environ.get(GitLabEnvVariables.ENCRYPTED_PAT),
-            os.environ.get(GitLabEnvVariables.PAT_ENCRYPTION_KEY)
-        ])
-
+        all_bookmarks = []
         # GitLab URL과 그룹 ID가 있고, 토큰 정보(PAT 또는 Deploy Token)가 있는지 확인
         if all([gitlab_url, group_id]) and (has_deploy_token or has_pat):
             try:
                 logger.info("그룹 %s 내 다른 프로젝트에서 북마크를 가져오는 중...", group_id)
-                other_bookmarks = self.fetcher.fetch_all_bookmarks(group_id, current_project_id)
-                logger.info("다른 프로젝트에서 %s개의 북마크를 찾았습니다.", len(other_bookmarks))
-
-                all_bookmarks.extend(other_bookmarks)
+                all_bookmarks = self.fetcher.fetch_all_bookmarks(group_id)
+                logger.info("다른 프로젝트에서 %s개의 북마크를 찾았습니다.", len(all_bookmarks))
             except Exception as e:
                 logger.error("다른 프로젝트에서 북마크를 가져오는 중 오류 발생: %s", str(e))
                 has_errors = True
@@ -119,18 +102,18 @@ class BookmarkValidator:
             logger.warning("경고: 다른 프로젝트의 북마크를 가져올 수 없습니다. 필요한 환경 변수가 누락되었습니다.")
             missing_vars = []
             if not gitlab_url:
-                missing_vars.append("CI_SERVER_URL")
+                missing_vars.append(GitLabEnvVariables.CI_SERVER_URL)
             if not group_id:
-                missing_vars.append("BOOKMARK_DATA_GROUP_ID")
+                missing_vars.append(GitLabEnvVariables.BOOKMARK_DATA_GROUP_ID)
             if not has_deploy_token and not has_pat:
                 missing_vars.append("인증 토큰 관련 변수 (ENCRYPTED_PAT/PAT_ENCRYPTION_KEY 또는 ENCRYPTED_DEPLOY_TOKEN/ENCRYPTION_KEY/DEPLOY_TOKEN_USERNAME)")
             logger.warning("누락된 변수: %s", ', '.join(missing_vars))
+            has_errors = True
 
         # 수집된 모든 북마크 검증
         validation_errors = self.schema.validate_bookmarks(all_bookmarks)
-        has_errors = has_errors or validation_errors
 
-        if has_errors:
+        if has_errors or validation_errors:
             logger.error("검증 실패. 위 오류를 확인하세요.")
             return 1
 
