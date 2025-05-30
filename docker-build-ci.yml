@@ -5,14 +5,15 @@ stages:
   - build
   - publish
 
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+
 build_docker_image:
   stage: build
   image: docker:latest
   services:
     - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: "/certs"
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
@@ -25,6 +26,7 @@ build_docker_image:
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
+        - app/**/*.py
         - scripts/*.py
         - Dockerfile
     - if: '$CI_COMMIT_TAG'
@@ -35,9 +37,6 @@ publish_tagged_version:
   image: docker:latest
   services:
     - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: "/certs"
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
