@@ -63,7 +63,7 @@ class PatApiClient(BaseGitLabClient):
         for file_info in files:
             # files에서 조건에 맞지 않는 데이터가 있는지 검사
             if not (file_info['type'] == 'blob' and file_info['path'].endswith(('.yml', '.yaml'))):
-                raise ValueError(f"GitLab 프로젝트({project_id})에 yaml 확장자가 아닌 파일이 존재합니다. file : {file_info}")
+                logger.warning(f"GitLab 프로젝트({project_id})에 yaml 확장자가 아닌 파일이 존재합니다. file : {file_info}")
 
             file_path = file_info['path']
             encoded_file_path = quote(file_path, safe='')
