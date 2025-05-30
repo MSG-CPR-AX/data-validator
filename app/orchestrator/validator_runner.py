@@ -43,7 +43,7 @@ class DataValidationOrchestrator:
         BookmarkValidationOrchestrator 초기화
         """
         self.authenticator = GitLabAuthenticator()
-        self.validator = BookmarkValidator(BookmarkJsonSchema().schema, self.authenticator)
+        self.validator = BookmarkValidator(BookmarkJsonSchema(), self.authenticator)
 
     def run(self):
         """
@@ -73,8 +73,8 @@ class DataValidationOrchestrator:
 
         # 다른 프로젝트의 데이터를 가져올지 여부 결정
         # CI 환경에서 실행 중이고 필요한 환경 변수가 설정된 경우에만 실행
-        has_deploy_token = self.authenticator.has_deploy_token()
         has_pat = self.authenticator.has_pat()
+        has_deploy_token = self.authenticator.has_deploy_token()
 
         fetch_others = (in_ci
                         and os.environ.get(GitLabEnvVariables.CI_SERVER_URL)

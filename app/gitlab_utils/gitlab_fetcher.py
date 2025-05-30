@@ -1,29 +1,4 @@
 #!/usr/bin/env python3
-"""
-GitLab 프로젝트 및 파일 수집기
-
-이 모듈은 app.gitlab_utils.gitlab_client 모듈의 PatApiClient 클래스를 사용하여
-그룹 내의 프로젝트 목록과 각 프로젝트의 YAML 파일을 수집하는 기능을 제공합니다.
-
-사용 예:
-    from app.integrations.gitlab_fetcher import GitLabBookmarkFetcher
-    from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
-
-    # GitLab 인증 객체 생성
-    authenticator = GitLabAuthenticator()
-
-    # GitLab 북마크 수집기 생성
-    fetcher = GitLabBookmarkFetcher(authenticator)
-
-    # 그룹 내 프로젝트 가져오기
-    projects = fetcher.fetch_group_projects(group_id)
-
-    # 프로젝트 내 YAML 파일 가져오기
-    yaml_files = fetcher.fetch_project_yaml_files(project_id)
-
-    # 모든 북마크 가져오기
-    bookmarks = fetcher.fetch_all_bookmarks(group_id)
-"""
 import logging
 import yaml
 from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
@@ -35,9 +10,11 @@ logger = logging.getLogger(__name__)
 
 class GitLabBookmarkFetcher:
     """
-    GitLab API를 사용하여 북마크 데이터를 수집하는 클래스
-    """
+    GitLab 프로젝트 및 그룹에서 북마크 데이터(YAML 파일 기반)를 수집, 처리 및 반환하는 클래스.
 
+    이 클래스는 GitLab API를 통해 그룹 내 프로젝트들을 조회하고 각 프로젝트의 데이터를 파싱하여 북마크 데이터를 추출합니다.
+    GitLab 인증 객체를 사용하여 API 요청을 처리하며, 다양한 형식의 에러를 관리하고 로그를 통해 문제를 보고합니다.
+    """
     def __init__(self, authenticator=None):
         """
         GitLabBookmarkFetcher 초기화

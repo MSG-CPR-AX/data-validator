@@ -12,25 +12,20 @@
 5. meta 필드는 선택적이며 추가 속성을 허용함
 
 사용 예:
-    from app.validators.bookmark_validator import SchemaLoader, BookmarkValidator
-
-    # 스키마 로더 생성
-    schema_loader = SchemaLoader()
-    schema = schema_loader.load_schema()
+    from app.validators.bookmark_validator import BookmarkValidator
+    from app.schemas.data_schema import BookmarkJsonSchema
 
     # 북마크 검증기 생성
-    validator = BookmarkValidator(schema)
+    validator = BookmarkValidator(BookmarkJsonSchema())
 
-    # 북마크 리스트 유효성 검사
-    has_errors = validator.validate_bookmarks(bookmarks)
-
-    # 현재 프로젝트의 북마크 로드 및 검증
-    bookmarks, has_errors = validator.load_current_project_bookmarks(current_dir)
+    # 북마크 데이터 검증
+    result = validator.validate_bookmarks_data()
 """
 import os
 import logging
+from typing import Optional
 
-from app.schemas.data_schema import BookmarkJsonSchema
+from app.schemas.data_schema import BookmarkJsonSchema, BaseJsonSchema
 from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
 from app.gitlab_utils.gitlab_fetcher import GitLabBookmarkFetcher
 from app.gitlab_utils.gitlab_constants import GitLabEnvVariables
@@ -44,21 +39,40 @@ class BookmarkValidator:
     북마크 YAML 데이터의 유효성을 검사하는 클래스
     """
 
-    def __init__(self, schema=None, authenticator=None):
+    def __init__(self, schema: Optional[BaseJsonSchema] = None, 
+                 authenticator: Optional[GitLabAuthenticator] = None):
         """
         BookmarkValidator 초기화
 
         매개변수:
-            schema (dict, 선택): 사용할 JSON 스키마. 없으면 SchemaLoader로 로드
+            schema (BaseJsonSchema, 선택): 사용할 JSON 스키마 객체. 
+                                          None이면 BookmarkJsonSchema 기본 생성
+            authenticator (GitLabAuthenticator, 선택): GitLab 인증 객체.
+                                                     None이면 기본 생성
+                                                     
+        예외:
+            TypeError: schema가 BaseJsonSchema의 인스턴스가 아닌 경우
         """
+        # schema 유효성 검사
         if schema is None:
-            self.schema = BookmarkJsonSchema().schema
+            self.schema = BookmarkJsonSchema()
         else:
+            if not isinstance(schema, BaseJsonSchema):
+                raise TypeError(
+                    f"schema는 BaseJsonSchema의 인스턴스여야 합니다. "
+                    f"제공된 타입: {type(schema).__name__}"
+                )
             self.schema = schema
 
+        # authenticator 유효성 검사
         if authenticator is None:
             self.authenticator = GitLabAuthenticator()
         else:
+            if not isinstance(authenticator, GitLabAuthenticator):
+                raise TypeError(
+                    f"authenticator는 GitLabAuthenticator의 인스턴스여야 합니다. "
+                    f"제공된 타입: {type(authenticator).__name__}"
+                )
             self.authenticator = authenticator
 
         self.fetcher = GitLabBookmarkFetcher(self.authenticator)
@@ -72,13 +86,11 @@ class BookmarkValidator:
         검증 중 오류가 발생하면 이를 감지하고, 결과에 따라 적절한 상태를 반환합니다.
         이를 통해 프로젝트 간 북마크 데이터의 일관성과 유효성을 유지할 수 있습니다.
 
-        매개변수:
-            current_dir (str): 현재 프로젝트 디렉토리
-            fetch_others (bool): 다른 프로젝트의 북마크도 가져올지 여부
-
         반환값:
             int: 성공 시 0, 실패 시 1
         """
+        has_errors = False
+        
         # 요청된 경우 다른 프로젝트에서 북마크를 가져옴
         gitlab_url = os.environ.get(GitLabEnvVariables.CI_SERVER_URL)
         group_id = os.environ.get(GitLabEnvVariables.BOOKMARK_DATA_GROUP_ID)
@@ -110,7 +122,7 @@ class BookmarkValidator:
             has_errors = True
 
         # 수집된 모든 북마크 검증
-        validation_errors = self.schema.validate_bookmarks(all_bookmarks)
+        validation_errors = self.schema.validate(all_bookmarks)
 
         if has_errors or validation_errors:
             logger.error("검증 실패. 위 오류를 확인하세요.")
@@ -118,4 +130,3 @@ class BookmarkValidator:
 
         logger.info("검증 성공. 총 %s개의 북마크를 찾았습니다.", len(all_bookmarks))
         return 0
-

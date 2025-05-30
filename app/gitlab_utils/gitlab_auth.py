@@ -116,7 +116,7 @@ class GitLabAuthenticator:
         ])
 
     def has_pat(self):
-        has_pat = all([
+        return all([
             self.encrypted_pat,
             self.pat_encryption_key
         ])
