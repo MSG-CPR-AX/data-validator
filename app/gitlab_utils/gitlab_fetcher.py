@@ -121,5 +121,5 @@ class GitLabBookmarkFetcher:
             except Exception as e:
                 logger.warning("⚠️  파일 처리 중 오류 발생: %s", str(e))
 
-        logger.info("📦 그룹 %s 내 총 %s개의 북마크 발견", group_id, len(all_bookmarks))
+        logger.info("📦 그룹ID : %s 내 총 %s개의 북마크 발견", group_id, len(all_bookmarks))
         return all_bookmarks
