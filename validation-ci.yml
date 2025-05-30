@@ -1,0 +1,30 @@
+# validation-ci.yml - 북마크 검증용 CI 구성
+# 이 파일은 다른 프로젝트에서 include하여 사용합니다.
+
+stages:
+  - validate
+
+validate_bookmarks:
+  stage: validate
+  image: registry.gitlab.com/sidebar-data/data-validator:latest
+  variables:
+    # bookmark-data 그룹 ID 지정
+    # BOOKMARK_DATA_GROUP_ID: (CI/CD 설정에서 설정/실제 그룹 ID로 변경해야 함)
+
+    # 배포 토큰 관련 변수는 CI/CD 설정에서 추가해야 함
+    # ENCRYPTED_DEPLOY_TOKEN: (CI/CD 설정에서 설정)
+    # ENCRYPTION_KEY: (CI/CD 설정에서 설정)
+    # DEPLOY_TOKEN_USERNAME: (CI/CD 설정에서 설정)
+  script:
+    - echo "CI_PROJECT_DIR=$CI_PROJECT_DIR"
+    - ls -al $CI_PROJECT_DIR
+    - find $CI_PROJECT_DIR -name "*.yml"
+    - cd $CI_PROJECT_DIR
+    - python3 /app/validate_bookmarks.py
+  rules:
+    # data-validator 프로젝트에서는 실행하지 않음
+    - if: '$CI_PROJECT_NAME == "data-validator"'
+      when: never
+    # 머지 리퀘스트에서만 실행
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always

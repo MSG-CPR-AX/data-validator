@@ -1,0 +1,9 @@
+# Default ignored files
+shelf/
+.idea/
+
+.gradle/
+.kotlin/
+build/
+target/
+*.iml
