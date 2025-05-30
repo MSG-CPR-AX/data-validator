@@ -11,7 +11,8 @@ RUN mkdir -p /src/bookmark-schema
 
 # Copy application structure maintaining original layout
 COPY app/ /src/app/
-COPY scripts/ /src/scripts/
+COPY schemas/ /src/scripts/
+COPY scripts/ /src/schemas/
 
 # Grant execution permission to main script
 RUN chmod +x /src/scripts/validate_bookmarks.py
