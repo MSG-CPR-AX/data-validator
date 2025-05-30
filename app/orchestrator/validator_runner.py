@@ -20,16 +20,15 @@
 """
 
 import os
-import sys
 import logging
 import textwrap
 
-from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
 from app.schemas.data_schema import BookmarkJsonSchema
 # 사용자 정의 모듈 임포트
 from app.validators.bookmark_validator import BookmarkValidator
 # 환경 변수 상수 임포트
 from app.gitlab_utils.gitlab_constants import GitLabEnvVariables
+from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
 
 # 로깅 설정
 logger = logging.getLogger(__name__)

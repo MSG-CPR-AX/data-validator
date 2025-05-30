@@ -3,8 +3,8 @@ import requests
 import logging
 import os
 from urllib.parse import quote
-from gitlab_constants import GitLabApiUrls, GitLabEnvVariables, ApiConstants
-from gitlab_auth import GitLabAuthenticator # GitLabAuthenticator 임포트
+from app.gitlab_utils.gitlab_constants import GitLabApiUrls, GitLabEnvVariables, ApiConstants
+from app.gitlab_utils.gitlab_auth import GitLabAuthenticator # GitLabAuthenticator 임포트
 
 logger = logging.getLogger(__name__)
 

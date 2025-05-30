@@ -3,7 +3,7 @@ import os
 import base64
 import logging
 from cryptography.fernet import Fernet
-from gitlab_constants import GitLabEnvVariables, HttpHeaders # .constants로 상대경로 임포트
+from app.gitlab_utils.gitlab_constants import GitLabEnvVariables, HttpHeaders # .constants로 상대경로 임포트
 
 logger = logging.getLogger(__name__)
 

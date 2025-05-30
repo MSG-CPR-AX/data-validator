@@ -30,10 +30,9 @@
 import os
 import logging
 
+from app.schemas.data_schema import BookmarkJsonSchema
 from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
 from app.gitlab_utils.gitlab_fetcher import GitLabBookmarkFetcher
-from app.schemas.data_schema import BookmarkJsonSchema
-
 from app.gitlab_utils.gitlab_constants import GitLabEnvVariables
 
 # 로깅 설정
