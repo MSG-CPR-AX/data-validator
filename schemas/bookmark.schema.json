@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bookmark Schema",
+  "description": "Schema for bookmark validation",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["name", "url", "domain", "category", "packages"],
+    "properties": {
+      "name": {"type": "string"},
+      "url": {"type": "string", "format": "uri"},
+      "domain": {"type": "string"},
+      "category": {"type": "string"},
+      "packages": {
+        "type": "array",
+        "items": {"$ref": "#/definitions/packageTag"},
+        "default": []
+      },
+      "meta": {
+        "type": "object",
+        "additionalProperties": True
+      }
+    },
+    "additionalProperties": False
+  },
+  "definitions": {
+    "packageTag": {
+      "type": "object",
+      "required": ["tag"],
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "패키지 태그명"
+        },
+        "subtags": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/packageTag"},
+          "default": [],
+          "description": "하위 태그들"
+        }
+      },
+      "additionalProperties": False
+    }
+  }
+}

@@ -167,13 +167,13 @@ class BookmarkJsonSchema(BaseJsonSchema, ABC):
     def _get_default_schema_paths(self) -> List[str]:
         """북마크 스키마 기본 경로들을 반환합니다."""
         paths = [
-            "bookmark-schema/bookmark.schema.json",
-            "../../../bookmark-schema/bookmark.schema.json"
+            "schemas/bookmark.schema.json",
+            "../schemas/bookmark.schema.json"
         ]
         
         # CI 환경에서의 경로 추가
         if 'CI_PROJECT_DIR' in os.environ:
-            ci_path = os.environ.get('CI_PROJECT_DIR', '') + "/bookmark-schema/bookmark.schema.json"
+            ci_path = os.environ.get('CI_PROJECT_DIR', '') + "/schemas/bookmark.schema.json"
             paths.append(ci_path)
         
         return paths

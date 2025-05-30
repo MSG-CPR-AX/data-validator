@@ -25,7 +25,7 @@ import os
 import logging
 from typing import Optional
 
-from app.schemas.data_schema import BookmarkJsonSchema, BaseJsonSchema
+from app.schema_rules.data_schema import BookmarkJsonSchema, BaseJsonSchema
 from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
 from app.gitlab_utils.gitlab_fetcher import GitLabBookmarkFetcher
 from app.gitlab_utils.gitlab_constants import GitLabEnvVariables

@@ -23,7 +23,7 @@ import os
 import logging
 import textwrap
 
-from app.schemas.data_schema import BookmarkJsonSchema
+from app.schema_rules.data_schema import BookmarkJsonSchema
 # 사용자 정의 모듈 임포트
 from app.validators.bookmark_validator import BookmarkValidator
 # 환경 변수 상수 임포트
