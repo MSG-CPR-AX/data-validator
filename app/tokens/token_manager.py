@@ -17,6 +17,7 @@ import os
 import base64
 from cryptography.fernet import Fernet
 from app.gitlab_utils.gitlab_auth import TokenCipher, GitLabAuthenticator
+from app.gitlab_utils.gitlab_constants import GitLabEnvVariables, HttpHeaders
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ class DeployTokenManager:
         """
         auth_str = f"{username}:{token}"
         encoded_auth = base64.b64encode(auth_str.encode()).decode()
-        return {"Authorization": f"Basic {encoded_auth}"}
+        return {HttpHeaders.AUTHORIZATION_HEADER: f"Basic {encoded_auth}"}
 
     @staticmethod
     def from_env():
@@ -57,9 +58,9 @@ class DeployTokenManager:
         """
         manager = DeployTokenManager()
 
-        encrypted_token = os.environ.get('ENCRYPTED_DEPLOY_TOKEN')
-        encryption_key = os.environ.get('ENCRYPTION_KEY')
-        username = os.environ.get('DEPLOY_TOKEN_USERNAME')
+        encrypted_token = os.environ.get(GitLabEnvVariables.ENCRYPTED_DEPLOY_TOKEN)
+        encryption_key = os.environ.get(GitLabEnvVariables.ENCRYPTION_KEY)
+        username = os.environ.get(GitLabEnvVariables.DEPLOY_TOKEN_USERNAME)
 
         if not all([encrypted_token, encryption_key, username]):
             logger.error("필수 환경 변수 누락: ENCRYPTED_DEPLOY_TOKEN, ENCRYPTION_KEY, DEPLOY_TOKEN_USERNAME")
@@ -89,7 +90,7 @@ class PATTokenManager:
         반환값:
             dict: Private-Token 인증 헤더 딕셔너리
         """
-        return {"Private-Token": token}
+        return {HttpHeaders.PRIVATE_TOKEN_HEADER: token}
 
     @staticmethod
     def from_env():
@@ -105,8 +106,8 @@ class PATTokenManager:
         """
         manager = PATTokenManager()
 
-        encrypted_pat = os.environ.get('ENCRYPTED_PAT')
-        encryption_key = os.environ.get('PAT_ENCRYPTION_KEY')
+        encrypted_pat = os.environ.get(GitLabEnvVariables.ENCRYPTED_PAT)
+        encryption_key = os.environ.get(GitLabEnvVariables.PAT_ENCRYPTION_KEY)
 
         if not all([encrypted_pat, encryption_key]):
             logger.error("PAT에 필요한 환경 변수 누락: ENCRYPTED_PAT, PAT_ENCRYPTION_KEY")
