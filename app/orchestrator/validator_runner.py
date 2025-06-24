@@ -20,20 +20,18 @@
 """
 
 import os
-import sys
 import logging
 import textwrap
 
+from app.schema_rules.data_schema import BookmarkJsonSchema
 # 사용자 정의 모듈 임포트
 from app.validators.bookmark_validator import BookmarkValidator
-from app.integrations.gitlab_fetcher import GitLabBookmarkFetcher
+# 환경 변수 상수 임포트
+from app.gitlab_utils.gitlab_constants import GitLabEnvVariables
+from app.gitlab_utils.gitlab_auth import GitLabAuthenticator
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
-
-# 환경 변수 상수 임포트
-from app.gitlab_utils.gitlab_constants import GitLabEnvVariables
-
 
 class DataValidationOrchestrator:
     """
@@ -44,8 +42,8 @@ class DataValidationOrchestrator:
         """
         BookmarkValidationOrchestrator 초기화
         """
-        self.validator = BookmarkValidator()
-        self.fetcher = GitLabBookmarkFetcher()
+        self.authenticator = GitLabAuthenticator()
+        self.validator = BookmarkValidator(BookmarkJsonSchema(), self.authenticator)
 
     def run(self):
         """
@@ -60,14 +58,10 @@ class DataValidationOrchestrator:
         if not is_verified:
             return 0
 
-        # YAML 파일을 검색할 현재 디렉토리 가져오기
-        current_dir = os.environ.get(GitLabEnvVariables.CI_PROJECT_DIR, '.')
-
         # 검증 수행
-        return self.validator.validate_bookmarks_data(current_dir, fetch_others)
+        return self.validator.validate_bookmarks_data()
 
-    @staticmethod
-    def check_environment():
+    def check_environment(self):
         """
         CI 환경 및 필요한 환경 변수를 확인합니다.
 
@@ -79,16 +73,8 @@ class DataValidationOrchestrator:
 
         # 다른 프로젝트의 데이터를 가져올지 여부 결정
         # CI 환경에서 실행 중이고 필요한 환경 변수가 설정된 경우에만 실행
-        has_deploy_token = all([
-            os.environ.get(GitLabEnvVariables.ENCRYPTED_DEPLOY_TOKEN),
-            os.environ.get(GitLabEnvVariables.ENCRYPTION_KEY),
-            os.environ.get(GitLabEnvVariables.DEPLOY_TOKEN_USERNAME)
-        ])
-
-        has_pat = all([
-            os.environ.get(GitLabEnvVariables.ENCRYPTED_PAT),
-            os.environ.get(GitLabEnvVariables.PAT_ENCRYPTION_KEY)
-        ])
+        has_pat = self.authenticator.has_pat()
+        has_deploy_token = self.authenticator.has_deploy_token()
 
         fetch_others = (in_ci
                         and os.environ.get(GitLabEnvVariables.CI_SERVER_URL)

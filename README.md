@@ -230,3 +230,29 @@ include:
   category: "Search/Engine"
   packages: []
 ```
+
+## Test
+### 실행 방법
+#### 1. 의존성 설치
+```shell
+pip install pytest pytest-mock
+```
+#### 2. 통합 테스트 실행
+```shell
+# 전체 통합 테스트 실행
+python -m pytest tests/test_integration_bookmark_validation.py -v
+
+# 특정 인증 시나리오 테스트
+python -m pytest tests/test_integration_bookmark_validation.py::TestBookmarkValidationIntegration::test_successful_validation_workflow_with_pat -v
+
+# 암호화 관련 테스트만 실행
+python -m pytest tests/test_integration_bookmark_validation.py -k "cipher" -v
+
+# 디버그 출력과 함께 실행
+python -m pytest tests/test_integration_bookmark_validation.py -v -s
+```
+#### 3. 빠른 로컬 테스트
+```shell
+# 메인 스크립트 직접 테스트 (모킹 포함)
+python -m pytest tests/test_integration_bookmark_validation.py::test_end_to_end_mock_scenario -v -s
+```

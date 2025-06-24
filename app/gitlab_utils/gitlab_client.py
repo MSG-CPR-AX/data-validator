@@ -3,8 +3,8 @@ import requests
 import logging
 import os
 from urllib.parse import quote
-from gitlab_constants import GitLabApiUrls, GitLabEnvVariables, ApiConstants
-from gitlab_auth import GitLabAuthenticator # GitLabAuthenticator 임포트
+from app.gitlab_utils.gitlab_constants import GitLabApiUrls, GitLabEnvVariables, ApiConstants
+from app.gitlab_utils.gitlab_auth import GitLabAuthenticator # GitLabAuthenticator 임포트
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class PatApiClient(BaseGitLabClient):
         super().__init__(authenticator)
         self.headers = self.authenticator.get_api_auth_headers() # PAT 우선 헤더 사용
 
-    def fetch_group_projects(self, group_id, exclude_project_id=None):
+    def fetch_group_projects(self, group_id):
         # 기존 fetch_group_projects 로직 이전 및 수정
         # 예: endpoint = GitLabApiUrls.GROUP_PROJECTS_ENDPOINT.format(group_id=group_id)
         endpoint = f"/groups/{group_id}/projects"
@@ -46,9 +46,9 @@ class PatApiClient(BaseGitLabClient):
 
         return [
             project for project in projects
-            if (exclude_project_id is None or str(project['id']) != exclude_project_id) and
-               not project['path_with_namespace'].endswith('data-validator')
+            if not project['path_with_namespace'].endswith('data-validator')
         ]
+
 
     def fetch_project_yaml_files_content(self, project_id, project_path_for_log=None):
         # 기존 fetch_project_yaml_files 로직 이전 및 수정
@@ -59,36 +59,39 @@ class PatApiClient(BaseGitLabClient):
 
         if not files: return []
 
-        yaml_files_content = []
+        yaml_files = []
         for file_info in files:
-            if file_info['type'] == 'blob' and file_info['path'].endswith(('.yml', '.yaml')):
-                file_path = file_info['path']
-                if file_path.startswith('.gitlab-ci') or '/gitlab-ci' in file_path:
-                    continue
+            # files에서 조건에 맞지 않는 데이터가 있는지 검사
+            if not (file_info['type'] == 'blob' and file_info['path'].endswith(('.yml', '.yaml'))):
+                logger.warning(f"GitLab 프로젝트({project_id})에 yaml 확장자가 아닌 파일이 존재합니다. file : {file_info}")
+                continue
 
-                encoded_file_path = quote(file_path, safe='')
-                file_content_endpoint = f"/projects/{project_id}/repository/files/{encoded_file_path}/raw"
-                # 여기서는 raw content를 가져오므로 _request 대신 requests.get 직접 사용 또는 _request 수정 필요
-                try:
-                    response = requests.get(f"{self.base_api_url}{file_content_endpoint}", headers=self.headers, params={"ref": "main"})
-                    response.raise_for_status()
-                    # yaml_files_content에 파일 경로와 내용을 함께 저장
-                    yaml_files_content.append({
-                        "path": file_path,
-                        "content": response.text,
-                        "project_id": project_id,
-                        "project_path_for_log": project_path_for_log or f"Project ID: {project_id}"
-                    })
-                except requests.exceptions.HTTPError as e:
-                    logger.warning(f"Failed to fetch file {file_path} from project {project_id}: {e.response.status_code}")
-                except requests.exceptions.RequestException as e:
-                    logger.warning(f"Request failed for file {file_path} from project {project_id}: {e}")
-        return yaml_files_content
+            file_path = file_info['path']
+            encoded_file_path = quote(file_path, safe='')
+            file_content_endpoint = f"/projects/{project_id}/repository/files/{encoded_file_path}/raw"
+            # 여기서는 raw content를 가져오므로 _request 대신 requests.get 직접 사용 또는 _request 수정 필요
+            try:
+                response = requests.get(f"{self.base_api_url}{file_content_endpoint}", headers=self.headers, params={"ref": "main"})
+                response.raise_for_status()
+                # yaml_files에 파일 경로와 내용을 함께 저장
+                yaml_files.append({
+                    "path": file_path,
+                    "content": response.text,
+                    "project_id": project_id,
+                    "project_path_for_log": project_path_for_log or f"Project ID: {project_id}"
+                })
+            except requests.exceptions.HTTPError as e:
+                logger.warning(f"Failed to fetch file {file_path} from project {project_id}: {e.response.status_code}")
+                raise ValueError(f"Failed to fetch file {file_path} from project {project_id}: {e.response.status_code}")
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Request failed for file {file_path} from project {project_id}: {e}")
+                raise ValueError(f"Request failed for file {file_path} from project {project_id}: {e}")
 
-    # fetch_all_bookmarks 와 같은 통합 함수도 이 클래스 내에 구현 가능
-    def fetch_all_bookmarks_from_group(self, group_id, exclude_project_id=None):
-        all_bookmarks_data = [] # YAML 파싱 전의 데이터 (content, 경로 등)
-        projects = self.fetch_group_projects(group_id, exclude_project_id)
+        return yaml_files
+
+    def fetch_all_yaml_files_from_group(self, group_id):
+        all_yaml_files = [] # YAML 파싱 전의 데이터 (content, 경로 등)
+        projects = self.fetch_group_projects(group_id)
         logger.info(f"Found {len(projects)} projects in group {group_id}")
 
         for project in projects:
@@ -97,10 +100,10 @@ class PatApiClient(BaseGitLabClient):
             logger.info(f"Fetching YAML files from project: {project_path_val}")
 
             files_content = self.fetch_project_yaml_files_content(project_id_val, project_path_val)
-            all_bookmarks_data.extend(files_content)
+            all_yaml_files.extend(files_content)
             logger.info(f"Found {len(files_content)} YAML files/contents in {project_path_val}")
 
-        return all_bookmarks_data # YAML 파싱은 이 데이터를 사용하는 쪽에서 수행
+        return all_yaml_files # YAML 파싱은 이 데이터를 사용하는 쪽에서 수행
 
 # DeployTokenApiClient는 필요시 유사하게 구현
 # class DeployTokenApiClient(BaseGitLabClient):

@@ -3,7 +3,7 @@ import os
 import base64
 import logging
 from cryptography.fernet import Fernet
-from .gitlab_constants import GitLabEnvVariables, HttpHeaders # .constants로 상대경로 임포트
+from app.gitlab_utils.gitlab_constants import GitLabEnvVariables, HttpHeaders # .constants로 상대경로 임포트
 
 logger = logging.getLogger(__name__)
 
@@ -102,17 +102,30 @@ class GitLabAuthenticator:
     def __init__(self):
         # 환경 변수에서 토큰 및 키 로드
         self.encrypted_pat = os.environ.get(GitLabEnvVariables.ENCRYPTED_PAT)
-        self.pat_encryption_key_str = os.environ.get(GitLabEnvVariables.PAT_ENCRYPTION_KEY)
+        self.pat_encryption_key = os.environ.get(GitLabEnvVariables.PAT_ENCRYPTION_KEY)
 
         self.encrypted_deploy_token = os.environ.get(GitLabEnvVariables.ENCRYPTED_DEPLOY_TOKEN)
-        self.deploy_token_encryption_key_str = os.environ.get(GitLabEnvVariables.ENCRYPTION_KEY)
+        self.deploy_token_encryption_key = os.environ.get(GitLabEnvVariables.ENCRYPTION_KEY)
         self.deploy_token_username = os.environ.get(GitLabEnvVariables.DEPLOY_TOKEN_USERNAME)
 
+    def has_deploy_token(self):
+        return all([
+            self.encrypted_deploy_token,
+            self.deploy_token_encryption_key,
+            self.deploy_token_username
+        ])
+
+    def has_pat(self):
+        return all([
+            self.encrypted_pat,
+            self.pat_encryption_key
+        ])
+
     def _get_decrypted_pat(self):
-        if not all([self.encrypted_pat, self.pat_encryption_key_str]):
+        if not all([self.encrypted_pat, self.pat_encryption_key]):
             logger.error(f"Missing PAT environment variables: {GitLabEnvVariables.ENCRYPTED_PAT}, {GitLabEnvVariables.PAT_ENCRYPTION_KEY}")
             raise ValueError("Missing PAT environment variables")
-        cipher = TokenCipher(key=self.pat_encryption_key_str)
+        cipher = TokenCipher(key=self.pat_encryption_key)
         return cipher.decrypt(self.encrypted_pat)
 
     def get_pat_headers(self):
@@ -120,10 +133,10 @@ class GitLabAuthenticator:
         return {HttpHeaders.PRIVATE_TOKEN_HEADER: token}
 
     def _get_decrypted_deploy_token(self):
-        if not all([self.encrypted_deploy_token, self.deploy_token_encryption_key_str, self.deploy_token_username]):
+        if not all([self.encrypted_deploy_token, self.deploy_token_encryption_key, self.deploy_token_username]):
             logger.error(f"Missing Deploy Token environment variables: {GitLabEnvVariables.ENCRYPTED_DEPLOY_TOKEN}, {GitLabEnvVariables.ENCRYPTION_KEY}, {GitLabEnvVariables.DEPLOY_TOKEN_USERNAME}")
             raise ValueError("Missing Deploy Token environment variables")
-        cipher = TokenCipher(key=self.deploy_token_encryption_key_str)
+        cipher = TokenCipher(key=self.deploy_token_encryption_key)
         return cipher.decrypt(self.encrypted_deploy_token)
 
     def get_deploy_token_headers(self):
